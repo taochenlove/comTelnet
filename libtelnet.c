@@ -18,21 +18,7 @@
 #include <string.h>
 #include <stdarg.h>
 
-/* Win32 compatibility */
-#if defined(_WIN32)
-# define vsnprintf _vsnprintf
-# define __func__ __FUNCTION__
-# define ZLIB_WINAPI 1
-# if defined(_MSC_VER)
-/* va_copy() is directly supported starting in Visual Studio 2013
- * https://msdn.microsoft.com/en-us/library/kb57fad8(v=vs.110).aspx
- * https://msdn.microsoft.com/en-us/library/kb57fad8(v=vs.120).aspx
- */
-#  if _MSC_VER <= 1700
-#   define va_copy(dest, src) (dest = src)
-#  endif
-# endif
-#endif
+
 
 #if defined(HAVE_ZLIB)
 # include <zlib.h>

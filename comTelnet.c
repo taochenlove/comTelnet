@@ -49,36 +49,6 @@ struct user_t {
 
 static struct user_t users[MAX_USERS];
 
-static void linebuffer_push(char *buffer, size_t size, int *linepos,
-		char ch, void (*cb)(const char *line, size_t overflow, void *ud),
-		void *ud) {
-
-	/* CRLF -- line terminator */
-	if (ch == '\n' && *linepos > 0 && buffer[*linepos - 1] == '\r') {
-		/* NUL terminate (replaces \r in buffer), notify app, clear */
-		buffer[*linepos - 1] = 0;
-		cb(buffer, 0, ud);
-		*linepos = 0;
-
-	/* CRNUL -- just a CR */
-	} else if (ch == 0 && *linepos > 0 && buffer[*linepos - 1] == '\r') {
-		/* do nothing, the CR is already in the buffer */
-
-	/* anything else (including technically invalid CR followed by
-	 * anything besides LF or NUL -- just buffer if we have room
-	 * \r
-	 */
-	} else if (*linepos != (int)size) {
-		buffer[(*linepos)++] = ch;
-
-	/* buffer overflow */
-	} else {
-		/* terminate (NOTE: eats a byte), notify app, clear buffer */
-		buffer[size - 1] = 0;
-		cb(buffer, size - 1, ud);
-		*linepos = 0;
-	}
-}
 
 static void _message(const char *from, const char *msg) {
 	int i;
@@ -116,57 +86,11 @@ static void _send(SOCKET sock, const char *buffer, size_t size) {
 	}
 }
 
-/* process input line */
-static void _online(const char *line, size_t overflow, void *ud) {
-	struct user_t *user = (struct user_t*)ud;
-	int i;
-
-	(void)overflow;
-
-	/* if the user has no name, this is his "login" */
-	if (user->name == 0) {
-		/* must not be empty, must be at least 32 chars */
-		if (strlen(line) == 0 || strlen(line) > 32) {
-			telnet_printf(user->telnet, "Invalid name.\nEnter name: ");
-			return;
-		}
-
-		/* must not already be in use */
-		for (i = 0; i != MAX_USERS; ++i) {
-			if (users[i].name != 0 && strcmp(users[i].name, line) == 0) {
-				telnet_printf(user->telnet, "Name in use.\nEnter name: ");
-				return;
-			}
-		}
-
-		/* keep name */
-		user->name = strdup(line);
-		telnet_printf(user->telnet, "Welcome, %s!\n", line);
-		return;
-	}
-
-	/* if line is "quit" then, well, quit */
-	if (strcmp(line, "quit") == 0) {
-		close(user->sock);
-		user->sock = -1;
-		_message(user->name, "** HAS QUIT **");
-		free(user->name);
-		user->name = 0;
-		return;
-	}
-
-	/* just a message -- send to all users */
-	_message(user->name, line);
-}
 
 static void _input(struct user_t *user, const char *buffer,
 		size_t size) {
 	unsigned int i;
 	for (i = 0; i != size; ++i) {
-		//linebuffer_push(user->linebuf, sizeof(user->linebuf), &user->linepos,
-		//		(char)buffer[i], _online, user);
-		if (buffer[i] == '\n')
-			continue;
 		serialWriteChar(pfd[MAX_USERS+1].fd, buffer[i]);
 	}
 }
@@ -330,15 +254,17 @@ int main(int argc, char **argv) {
 
 			/* init, welcome */
 			users[i].sock = client_sock;
-			users[i].telnet = telnet_init(telopts, _event_handler, 0,
+			users[i].telnet = telnet_init(telopts, _event_handler, TELNET_FLAG_NVT_EOL,
 					&users[i]);
-				#if 0
 			telnet_negotiate(users[i].telnet, TELNET_WILL,
 					TELNET_TELOPT_COMPRESS2);
-			telnet_printf(users[i].telnet, "Enter name: ");
+
+	//		telnet_printf(users[i].telnet, "Enter name: ");
 
 			telnet_negotiate(users[i].telnet, TELNET_WILL, TELNET_TELOPT_ECHO);
-			#endif
+			telnet_negotiate(users[i].telnet, TELNET_WONT, TELNET_TELOPT_LINEMODE);
+			telnet_negotiate(users[i].telnet, TELNET_WILL, TELNET_TELOPT_SGA);
+
 		}
 
 		if (pfd[MAX_USERS + 1].revents & POLLIN) {
@@ -346,7 +272,7 @@ int main(int argc, char **argv) {
 			serialReadChar(fd, &c);
 			for (i = 0; i< MAX_USERS; i++) {
 				if (users[i].telnet != NULL) {
-					printf("%c", c);
+			//		printf("%c", c);
 					telnet_printf(users[i].telnet, "%c", c);
 				}
 			
