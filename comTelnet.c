@@ -397,12 +397,11 @@ int main(int argc, char **argv) {
 		pfd[MAX_SERIAL_NUM+1].fd = fd;
 		pfd[MAX_SERIAL_NUM+1].events = POLLIN;
 		fd = init_listen_socket(telnet_port);
+		
 		p_com_mng->serial[0].listen_fd = fd;
 		p_com_mng->serial[0].listen_port = telnet_port;
 		pfd[0].fd = fd;
 		pfd[0].events = POLLIN;
-		fd = init_listen_socket(telnet_port);
-
 		printf("open dev [%s] listen on port [%d]\n", serial_dev, telnet_port);
 	}
 	
@@ -481,7 +480,7 @@ int main(int argc, char **argv) {
 					}					
 				}
 
-				printf("[%s][%d] Connecte user [%s][%u]. current user number [%d]\n", p_serial->dev_name, p_serial->listen_port, inet_ntop(addr.sin_family, &(addr.sin_addr), ip, 16), ntohs(addr.sin_port), p_serial->users_num);
+				printf("[%s][%d] Connect user [%s][%u]. current user number [%d]\n", p_serial->dev_name, p_serial->listen_port, inet_ntop(addr.sin_family, &(addr.sin_addr), ip, 16), ntohs(addr.sin_port), p_serial->users_num);
 				
 				if (i == MAX_USERS) {
 					printf("  rejected (too many users)\n");
